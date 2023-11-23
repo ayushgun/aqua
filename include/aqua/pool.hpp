@@ -10,6 +10,7 @@
 #include <optional>
 #include <semaphore>
 #include <thread>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -36,6 +37,7 @@ class thread_pool {
 
   /// Submits a task to the pool and returns a future<R> to caller.
   template <typename R, typename F, typename... A>
+    requires std::is_invocable_r_v<R, F, A...>
   std::future<R> submit(F function, A... arguments) {
     // Create a shared promise to manage the result or exception of the task
     auto shared_promise = std::make_shared<std::promise<R>>();
