@@ -66,7 +66,7 @@ class thread_pool {
   }
 
  private:
-  /// Enqueues a task to the appropriate thread queue based on priority
+  /// Enqueues a task to the appropriate thread queue based on priority.
   template <typename F>
   void push_task(F&& task_handler) {
     // Get the index of the next thread from the priority queue
