@@ -33,7 +33,7 @@ class thread_pool {
   thread_pool(const thread_pool&) = delete;
   thread_pool& operator=(const thread_pool&) = delete;
 
-  /// Returns the number of threads in the pool.
+  /// Returns the number of unprocessed tasks in the pool.
   std::size_t size() const;
 
   /// Submits a task to the pool and returns a future<R> to caller.
@@ -54,7 +54,7 @@ class thread_pool {
           promise->set_value(callable(args...));
         }
       } catch (...) {
-        // Propogate the return type if the callable throws an exception
+        // Propogate the exception if the callable throws an exception
         promise->set_exception(std::current_exception());
       }
     };
@@ -101,6 +101,7 @@ class thread_pool {
 
   std::vector<std::thread> threads;
   std::vector<std::unique_ptr<aqua::stop_signal>> stop_signals;
+
   std::deque<task_queue> thread_queues;
   aqua::queue<std::size_t, std::mutex> priorities;
 };

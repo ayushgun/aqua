@@ -81,6 +81,6 @@ aqua::thread_pool::~thread_pool() {
   }
 }
 
-size_t aqua::thread_pool::size() const {
-  return threads.size();
+std::size_t aqua::thread_pool::size() const {
+  return static_cast<std::size_t>(unprocessed_tasks);
 }
