@@ -1,5 +1,4 @@
 #include <atomic>
-#include <exception>
 #include <functional>
 #include <thread>
 
@@ -12,52 +11,59 @@ aqua::thread_pool::thread_pool(const std::size_t thread_count)
     : thread_queues(thread_count) {
   std::size_t current_id = 0;
 
-  // Initialize the specified number of threads
+  // Loop to create and start each thread in the pool
   for (std::size_t i = 0; i < thread_count; ++i) {
     priorities.push_back(std::move(current_id));
 
     try {
-      // Create and start new thread with a lambda function as the thread's task
-      threads.emplace_back([&, id = current_id]() {
-        while (!stop_flag.load()) {
+      // Create a stop token for each thread to signal it to stop
+      stop_signals.push_back(std::make_unique<aqua::stop_signal>());
+
+      // Initialize each thread to process tasks from a queue
+      threads.emplace_back([&, id = current_id,
+                            token = aqua::stop_token(*stop_signals.back())]() {
+        do {
           // Block until this thread is signaled to process a task
           thread_queues[id].availability.acquire();
 
-          // Check for pending tasks and execute them
-          while (unprocessed_tasks.load(std::memory_order_acquire) > 0) {
-            // Process tasks assigned to this thread
+          do {
+            // Process all available tasks in the queue
             while (auto task = thread_queues[id].tasks.front()) {
               thread_queues[id].tasks.pop_front();
 
-              // Decrease count of pending tasks and complete each task
-              unprocessed_tasks.fetch_sub(1, std::memory_order_release);
-              std::invoke(std::move(task.value()));
-            }
-
-            // Attempt to steal a task from another thread if this thread has no
-            // remaining tasks
-            for (std::size_t qid = 1; qid < thread_queues.size(); ++qid) {
-              const std::size_t target_id = (id + qid) % thread_queues.size();
-
-              if (auto stolen_task = thread_queues[target_id].tasks.steal()) {
-                // If a task is successfully stolen, execute it
+              try {
+                // Decrement the count of unprocessed tasks and execute the task
                 unprocessed_tasks.fetch_sub(1, std::memory_order_release);
-                std::invoke(std::move(stolen_task.value()));
+                std::invoke(std::move(task.value()));
+              } catch (...) {
+                // Ignore any exceptions thrown by the task
+              }
 
-                // Stop trying to steal more tasks after one is executed
-                break;
+              // Attempt to steal a task from another thread if this thread has
+              // no remaining tasks
+              for (std::size_t qid = 1; qid < thread_queues.size(); ++qid) {
+                const std::size_t target_id = (id + qid) % thread_queues.size();
+
+                if (auto stolen_task = thread_queues[target_id].tasks.steal()) {
+                  // If a task is successfully stolen, execute it
+                  unprocessed_tasks.fetch_sub(1, std::memory_order_release);
+                  std::invoke(std::move(stolen_task.value()));
+
+                  // Stop trying to steal more tasks after one is executed
+                  break;
+                }
               }
             }
-          }
+          } while (unprocessed_tasks.load(std::memory_order_acquire) > 0);
 
-          // Once tasks are completed, assign this thread the highest priority
+          // Update the priority of this thread after processing tasks
           priorities.move_front(id);
-        }
+        } while (!token.stop_requested());
       });
 
       current_id += 1;
-    } catch (const std::exception& exception) {
-      // Remove exception origin thread from the task queue and priority queue
+    } catch (...) {
+      // In case of an exception, remove the last added queue and priority
       thread_queues.pop_back();
       priorities.pop_back();
     }
@@ -65,12 +71,13 @@ aqua::thread_pool::thread_pool(const std::size_t thread_count)
 }
 
 aqua::thread_pool::~thread_pool() {
-  stop_flag.store(true);
-
-  // Stop and join all threads in the pool
   for (std::size_t i = 0; i < threads.size(); ++i) {
+    stop_signals[i]->request_stop();
     thread_queues[i].availability.release();
-    threads[i].join();
+
+    if (threads[i].joinable()) {
+      threads[i].join();
+    }
   }
 }
 
