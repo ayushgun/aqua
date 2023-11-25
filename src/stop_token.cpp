@@ -2,12 +2,12 @@
 #include <mutex>
 
 void aqua::stop_signal::request_stop() {
-  std::scoped_lock<std::mutex> lock(mutex);
+  std::scoped_lock lock(mutex);
   stop = true;
 }
 
 bool aqua::stop_signal::stop_requested() const {
-  std::scoped_lock<std::mutex> lock(mutex);
+  std::scoped_lock lock(mutex);
   return stop;
 }
 
