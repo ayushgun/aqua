@@ -11,7 +11,6 @@ endif()
 
 add_library(aqua SHARED
     src/pool.cpp
-    src/stop_token.cpp
 )
 
 target_include_directories(aqua PUBLIC

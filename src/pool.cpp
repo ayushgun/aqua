@@ -1,5 +1,5 @@
 #include <atomic>
-#include <functional>
+#include <iostream>
 #include <thread>
 
 #include "aqua/pool.hpp"
@@ -9,6 +9,7 @@ aqua::thread_pool::thread_pool()
 
 aqua::thread_pool::thread_pool(const std::size_t thread_count)
     : thread_queues(thread_count) {
+  std::cout << "Flag branch\n";
   std::size_t current_id = 0;
 
   // Loop to create and start each thread in the pool
@@ -17,11 +18,11 @@ aqua::thread_pool::thread_pool(const std::size_t thread_count)
 
     try {
       // Create a stop token for each thread to signal it to stop
-      stop_signals.push_back(std::make_unique<aqua::stop_signal>());
+      stop_signals.push_back(std::make_unique<std::atomic_flag>());
+      stop_signals.back()->clear();
 
       // Initialize each thread to process tasks from a queue
-      threads.emplace_back([&, id = current_id,
-                            token = aqua::stop_token(*stop_signals.back())]() {
+      threads.emplace_back([&, id = current_id]() {
         do {
           // Block until this thread is signaled to process a task
           thread_queues[id].availability.acquire();
@@ -58,7 +59,7 @@ aqua::thread_pool::thread_pool(const std::size_t thread_count)
 
           // Update the priority of this thread after processing tasks
           priorities.move_front(id);
-        } while (!token.stop_requested());
+        } while (!stop_signals[id]->test());
       });
 
       current_id += 1;
@@ -72,7 +73,7 @@ aqua::thread_pool::thread_pool(const std::size_t thread_count)
 
 aqua::thread_pool::~thread_pool() {
   for (std::size_t i = 0; i < threads.size(); ++i) {
-    stop_signals[i]->request_stop();
+    stop_signals[i]->test_and_set();
     thread_queues[i].availability.release();
 
     if (threads[i].joinable()) {
