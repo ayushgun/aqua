@@ -84,10 +84,11 @@ class thread_pool {
 
     // Add the task to the selected thread's task queue
     size_t thread_index = *next_thread;
-    thread_queues[thread_index].tasks.push_back(std::forward<F>(task_handler));
+    thread_task_queues[thread_index].tasks.push_back(
+        std::forward<F>(task_handler));
 
     // Signal the thread that a new task has been added
-    thread_queues[thread_index].availability.release();
+    thread_task_queues[thread_index].availability.release();
   }
 
   /// Represents a task queue with thread-safe task storage and a semaphore
@@ -102,7 +103,7 @@ class thread_pool {
   std::vector<std::thread> threads;
   std::vector<std::unique_ptr<aqua::stop_signal>> stop_signals;
 
-  std::deque<task_queue> thread_queues;
+  std::deque<task_queue> thread_task_queues;
   aqua::queue<std::size_t, std::mutex> priorities;
 };
 }  // namespace aqua
