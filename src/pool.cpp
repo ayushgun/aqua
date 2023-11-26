@@ -17,9 +17,9 @@ aqua::thread_pool::thread_pool(const std::size_t thread_count)
     priorities.push_back(std::move(current_id));
 
     try {
-      // Create a stop token for each thread to signal it to stop
-      stop_signals.push_back(std::make_unique<std::atomic_flag>());
-      stop_signals.back()->clear();
+      // Create a atomic_flag for each thread to enable cooperative interruption
+      interrupt_flags.push_back(std::make_unique<std::atomic_flag>());
+      interrupt_flags.back()->clear();
 
       // Initialize each thread to process tasks from a queue
       threads.emplace_back([&, id = current_id]() {
@@ -59,7 +59,7 @@ aqua::thread_pool::thread_pool(const std::size_t thread_count)
 
           // Update the priority of this thread after processing tasks
           priorities.move_front(id);
-        } while (!stop_signals[id]->test());
+        } while (!interrupt_flags[id]->test());
       });
 
       current_id += 1;
@@ -73,9 +73,12 @@ aqua::thread_pool::thread_pool(const std::size_t thread_count)
 
 aqua::thread_pool::~thread_pool() {
   for (std::size_t i = 0; i < threads.size(); ++i) {
-    stop_signals[i]->test_and_set();
+    // Set the atomic flag to true to signal the thread to stop execution
+    interrupt_flags[i]->test_and_set();
+
     thread_queues[i].availability.release();
 
+    // Check joinability and then join the thread to avoid dangling threads
     if (threads[i].joinable()) {
       threads[i].join();
     }

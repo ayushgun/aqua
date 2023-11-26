@@ -99,7 +99,7 @@ class thread_pool {
   std::atomic_int32_t unprocessed_tasks;
 
   std::vector<std::thread> threads;
-  std::vector<std::unique_ptr<std::atomic_flag>> stop_signals;
+  std::vector<std::unique_ptr<std::atomic_flag>> interrupt_flags;
 
   std::deque<task_queue> thread_queues;
   aqua::queue<std::size_t, std::mutex> priorities;
