@@ -7,10 +7,12 @@
 #include <utility>
 
 namespace aqua {
-template <typename L>
-concept lockable = std::is_invocable_v<decltype(&L::lock), L&> &&
-                   std::is_invocable_v<decltype(&L::unlock), L&> &&
-                   std::is_invocable_r_v<bool, decltype(&L::try_lock), L&>;
+template <typename T>
+concept lockable = requires(T& t) {
+  t.lock();
+  t.unlock();
+  { t.try_lock() } -> std::same_as<bool>;
+};
 
 /// Thread-safe queue implementation with lockable policy for synchronization.
 template <typename T, lockable L>
@@ -39,7 +41,7 @@ class queue {
   /// Adds a new element to the front of the queue.
   void push_front(T&& value) {
     std::scoped_lock lock(mutex);
-    backing_queue.push_front(std::forward(value));
+    backing_queue.push_front(std::forward<T>(value));
   }
 
   /// Moves an existing element to the front of the queue.
