@@ -2,16 +2,13 @@
 
 #include <atomic>
 #include <deque>
-#include <exception>
 #include <functional>
 #include <future>
 #include <memory>
 #include <mutex>
-#include <optional>
 #include <semaphore>
 #include <thread>
 #include <type_traits>
-#include <utility>
 #include <vector>
 
 #include "aqua/queue.hpp"
@@ -35,17 +32,20 @@ class thread_pool {
   /// Returns the number of unprocessed tasks in the pool.
   std::size_t size() const;
 
-  /// Submits a task to the pool and returns a future<R> to caller.
+  /// Submits a task to the pool and returns a future<R> to the caller. All
+  /// exceptions are propogated via the returned future.
   template <typename R, typename F, typename... A>
     requires std::is_invocable_r_v<R, F, A...>
   std::future<R> submit(F function, A... arguments) {
-    // Create a shared promise to manage the result or exception of the task
     auto shared_promise = std::make_shared<std::promise<R>>();
+    std::future<R> future = shared_promise->get_future();
+
     auto task_handler = [promise = shared_promise,
                          callable = std::move(function),
-                         ... args = std::move(arguments)]() {
+                         ... args = std::move(arguments)]() mutable {
       try {
-        // Propogate the return type if the callable return type is not void
+        // Call the callable and store the return value in the promise if the
+        // callable does not returns void
         if constexpr (std::is_same_v<R, void>) {
           callable(args...);
           promise->set_value();
@@ -58,51 +58,63 @@ class thread_pool {
       }
     };
 
-    auto future = shared_promise->get_future();
-    push_task(std::move(task_handler));
+    schedule_task(std::move(task_handler));
+    return future;
+  }
 
-    // Return the future to the caller, allowing them to await the task's result
+  /// Submits a void-returning task to the pool and returns a future<void> to
+  /// the caller. All exceptions are propogated via the returned future.
+  template <typename F, typename... A>
+    requires std::is_invocable_v<F, A...>
+  std::future<void> submit(F function, A... arguments) {
+    auto shared_promise = std::make_shared<std::promise<void>>();
+    std::future<void> future = shared_promise->get_future();
+
+    auto task_handler = [promise = shared_promise,
+                         callable = std::move(function),
+                         ... args = std::move(arguments)]() {
+      try {
+        // Call the callable and initialize the promise with an empty value
+        callable(args...);
+        promise->set_value();
+      } catch (...) {
+        // Propagate the exception if the callable throws an exception
+        promise->set_exception(std::current_exception());
+      }
+    };
+
+    schedule_task(std::move(task_handler));
     return future;
   }
 
  private:
-  /// Enqueues a task to the appropriate thread queue based on priority.
+  /// Schedules a task by adding it to the queue of a selected thread based on a
+  /// round robin load balancing policy.
   template <typename F>
-  void push_task(F&& task_handler) {
-    // Get the index of the next thread from the priority queue
-    std::optional<std::size_t> next_thread = priorities.front();
-
-    // Exit if the priority queue is empty (i.e., no threads are available)
-    if (!next_thread.has_value()) {
-      return;
-    }
-
-    priorities.pop_front();
-    priorities.push_back(std::move(*next_thread));
+  void schedule_task(F&& task_handler) {
+    // Find the next thread to push the task onto
+    std::size_t next_thread_id = submitted_tasks % threads.size();
     unprocessed_tasks.fetch_add(1, std::memory_order_relaxed);
 
-    // Add the task to the selected thread's task queue
-    size_t thread_index = *next_thread;
-    thread_task_queues[thread_index].tasks.push_back(
-        std::forward<F>(task_handler));
+    // Push the task to the back of the next thread's task queue
+    task_queues[next_thread_id].tasks.push_back(std::forward<F>(task_handler));
 
     // Signal the thread that a new task has been added
-    thread_task_queues[thread_index].availability.release();
+    task_queues[next_thread_id].ready.release();
   }
 
   /// Represents a task queue with thread-safe task storage and a semaphore
   /// indicating task availability.
   struct task_queue {
     aqua::queue<std::function<void()>, std::mutex> tasks;
-    std::binary_semaphore availability{0};
+    std::binary_semaphore ready{0};
   };
 
-  std::atomic_int32_t unprocessed_tasks;
+  std::atomic_int_fast32_t unprocessed_tasks{};
+  std::atomic_int_fast32_t submitted_tasks{};
 
   std::vector<std::thread> threads;
-  std::vector<std::unique_ptr<std::atomic_flag>> interrupt_flags;
-
-  std::deque<task_queue> thread_task_queues;
-  aqua::queue<std::size_t, std::mutex> priorities;
+  std::vector<std::unique_ptr<std::atomic_flag>> stop_flags;
+  std::deque<task_queue> task_queues;
 };
 }  // namespace aqua
