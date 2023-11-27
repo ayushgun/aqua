@@ -20,57 +20,42 @@ aqua::thread_pool::thread_pool(const std::size_t thread_count)
     stop_flags.back()->clear();
 
     // Initialize the thread with logic to process tasks in the pool
-    threads.emplace_back([&, thread_id = i]() {
-      while (!stop_flags[thread_id]->test()) {
-        // Acquire the semaphore to block until this thread is signalled to
-        // continue processing tasks
-        task_queues[thread_id].ready.acquire();
+    threads.emplace_back([&, i]() { thread_loop(i); });
+  }
+}
 
-        // Process tasks while there are still unprocessed tasks left
-        while (unprocessed_tasks.load(std::memory_order_acquire) > 0) {
-          // Process all available tasks in this thread's task queue
-          while (auto task = task_queues[thread_id].tasks.front()) {
-            task_queues[thread_id].tasks.pop_front();
+void aqua::thread_pool::thread_loop(std::size_t thread_idx) {
+  while (!stop_flags[thread_idx]->test()) {
+    // Acquire the semaphore to block until this thread is signalled to
+    // continue processing tasks
+    task_queues[thread_idx].ready.acquire();
 
-            // Execute the task and decrement the number of unprocessed tasks
-            std::invoke(std::move(*task));
-            unprocessed_tasks.fetch_sub(1, std::memory_order_release);
-          }
+    // Process tasks while there are still unprocessed tasks left
+    while (unprocessed_tasks.load(std::memory_order_acquire) > 0) {
+      // Process all available tasks in this thread's task queue
+      while (auto task_opt = task_queues[thread_idx].tasks.front()) {
+        task_queues[thread_idx].tasks.pop_front();
 
-          // Attempt to steal a task if this thread has no remaining tasks
-          // for (std::size_t offset = 0; offset < threads.size(); ++offset) {
-          //   std::size_t target_thread_id =
-          //       (thread_id + offset) % threads.size();
-
-          //   // Steal the next queued up task from this thread's task queue
-          //   if (auto stolen_task =
-          //           task_queues[target_thread_id].tasks.steal()) {
-          //     // Execute the task and decrement the unprocessed task count
-          //     std::invoke(std::move(*stolen_task));
-          //     unprocessed_tasks.fetch_sub(1, std::memory_order_release);
-
-          //     // Stop trying to steal more tasks after one is executed
-          //     break;
-          //   }
-          // }
-        }
+        // Execute the task and decrement the number of unprocessed tasks
+        std::invoke(std::move(*task_opt));
+        unprocessed_tasks.fetch_sub(1, std::memory_order_release);
       }
-    });
+    }
   }
 }
 
 aqua::thread_pool::~thread_pool() {
   // Cooperatively interrupt all thread's execution
-  for (std::size_t thread_id = 0; thread_id < threads.size(); ++thread_id) {
-    stop_flags[thread_id]->test_and_set();
+  for (std::size_t thread_idx = 0; thread_idx < threads.size(); ++thread_idx) {
+    stop_flags[thread_idx]->test_and_set();
   }
 
   // Unblock all threads and join all joinable threads
-  for (std::size_t thread_id = 0; thread_id < threads.size(); ++thread_id) {
-    task_queues[thread_id].ready.release();
+  for (std::size_t thread_idx = 0; thread_idx < threads.size(); ++thread_idx) {
+    task_queues[thread_idx].ready.release();
 
-    if (threads[thread_id].joinable()) {
-      threads[thread_id].join();
+    if (threads[thread_idx].joinable()) {
+      threads[thread_idx].join();
     }
   }
 }

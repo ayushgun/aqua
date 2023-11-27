@@ -4,7 +4,6 @@
 #include <deque>
 #include <functional>
 #include <future>
-#include <iostream>
 #include <memory>
 #include <mutex>
 #include <semaphore>
@@ -87,20 +86,24 @@ class thread_pool {
   }
 
  private:
+  /// Executes the main loop for each thread, processing tasks from the task
+  /// queue until stopped.
+  void thread_loop(std::size_t thread_idx);
+
   /// Schedules a task by adding it to the queue of a selected thread based on a
   /// round robin load balancing policy.
   template <typename F>
   void schedule_task(F&& task) {
     // Find the next thread to push the task onto
-    std::size_t next_thread_id = submitted_tasks % threads.size();
+    std::size_t next_thread_idx = submitted_tasks % threads.size();
     submitted_tasks.fetch_add(1, std::memory_order_relaxed);
     unprocessed_tasks.fetch_add(1, std::memory_order_relaxed);
 
     // Push the task to the back of the next thread's task queue
-    task_queues[next_thread_id].tasks.push_back(std::forward<F>(task));
+    task_queues[next_thread_idx].tasks.push_back(std::forward<F>(task));
 
     // Signal the thread that a new task has been added
-    task_queues[next_thread_id].ready.release();
+    task_queues[next_thread_idx].ready.release();
   }
 
   /// Represents a task queue with thread-safe task storage and a semaphore
