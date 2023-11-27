@@ -41,7 +41,7 @@ class queue {
   /// Adds a new element to the front of the queue.
   void push_front(T&& value) {
     std::scoped_lock lock(mutex);
-    backing_queue.push_front(std::forward(value));
+    backing_queue.push_front(std::forward<T>(value));
   }
 
   /// Moves an existing element to the front of the queue.
