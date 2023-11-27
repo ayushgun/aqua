@@ -38,21 +38,21 @@ aqua::thread_pool::thread_pool(const std::size_t thread_count)
           }
 
           // Attempt to steal a task if this thread has no remaining tasks
-          // for (std::size_t offset = 0; offset < threads.size(); ++offset) {
-          //   std::size_t target_thread_id =
-          //       (thread_id + offset) % threads.size();
+          for (std::size_t offset = 0; offset < threads.size(); ++offset) {
+            std::size_t target_thread_id =
+                (thread_id + offset) % threads.size();
 
-          //   // Steal the next queued up task from this thread's task queue
-          //   if (auto stolen_task =
-          //   task_queues[target_thread_id].tasks.back()) {
-          //     // Execute the task and decrement the number of unprocessed
-          //     tasks std::invoke(std::move(*stolen_task));
-          //     unprocessed_tasks.fetch_sub(1, std::memory_order_release);
+            // Steal the next queued up task from this thread's task queue
+            if (auto stolen_task =
+                    task_queues[target_thread_id].tasks.steal()) {
+              // Execute the task and decrement the number of unprocessed tasks
+              std::invoke(std::move(*stolen_task));
+              unprocessed_tasks.fetch_sub(1, std::memory_order_release);
 
-          //     // Stop trying to steal more tasks after one is executed
-          //     break;
-          //   }
-          // }
+              // Stop trying to steal more tasks after one is executed
+              break;
+            }
+          }
         }
       }
     });
