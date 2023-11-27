@@ -23,10 +23,13 @@ int main() {
   aqua::thread_pool pool;
 
   // Submit a void callable to the thread pool
-  pool.submit<void>([]() { std::cout << "Void task executed.\n"; });
+  pool.submit([]() { std::cout << "Void task executed.\n"; });
 
   // Submit a callable that increments an integer and returns the result
   auto future = pool.submit<int>([](int value) { return ++value; }, 1);
+  //                        ^^^
+  //                        Explicitly provide the return type as a template argument
+
   std::cout << "Task returned: " << future.get() << "\n";
 
   return 0;
