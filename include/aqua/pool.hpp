@@ -4,6 +4,7 @@
 #include <deque>
 #include <functional>
 #include <future>
+#include <iostream>
 #include <memory>
 #include <mutex>
 #include <semaphore>
@@ -41,7 +42,7 @@ class thread_pool {
     std::future<R> future = shared_promise->get_future();
 
     auto task = [promise = shared_promise, callable = std::move(function),
-                 ... args = std::move(arguments)]() mutable {
+                 ... args = std::move(arguments)]() {
       try {
         // Call the callable and store the return value in the promise if the
         // callable does not returns void
@@ -92,6 +93,7 @@ class thread_pool {
   void schedule_task(F&& task) {
     // Find the next thread to push the task onto
     std::size_t next_thread_id = submitted_tasks % threads.size();
+    submitted_tasks.fetch_add(1, std::memory_order_relaxed);
     unprocessed_tasks.fetch_add(1, std::memory_order_relaxed);
 
     // Push the task to the back of the next thread's task queue
