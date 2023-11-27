@@ -40,9 +40,8 @@ class thread_pool {
     auto shared_promise = std::make_shared<std::promise<R>>();
     std::future<R> future = shared_promise->get_future();
 
-    auto task_handler = [promise = shared_promise,
-                         callable = std::move(function),
-                         ... args = std::move(arguments)]() mutable {
+    auto task = [promise = shared_promise, callable = std::move(function),
+                 ... args = std::move(arguments)]() mutable {
       try {
         // Call the callable and store the return value in the promise if the
         // callable does not returns void
@@ -58,7 +57,7 @@ class thread_pool {
       }
     };
 
-    schedule_task(std::move(task_handler));
+    schedule_task(std::move(task));
     return future;
   }
 
@@ -70,9 +69,8 @@ class thread_pool {
     auto shared_promise = std::make_shared<std::promise<void>>();
     std::future<void> future = shared_promise->get_future();
 
-    auto task_handler = [promise = shared_promise,
-                         callable = std::move(function),
-                         ... args = std::move(arguments)]() {
+    auto task = [promise = shared_promise, callable = std::move(function),
+                 ... args = std::move(arguments)]() {
       try {
         // Call the callable and initialize the promise with an empty value
         callable(args...);
@@ -83,7 +81,7 @@ class thread_pool {
       }
     };
 
-    schedule_task(std::move(task_handler));
+    schedule_task(std::move(task));
     return future;
   }
 
@@ -91,13 +89,13 @@ class thread_pool {
   /// Schedules a task by adding it to the queue of a selected thread based on a
   /// round robin load balancing policy.
   template <typename F>
-  void schedule_task(F&& task_handler) {
+  void schedule_task(F&& task) {
     // Find the next thread to push the task onto
     std::size_t next_thread_id = submitted_tasks % threads.size();
     unprocessed_tasks.fetch_add(1, std::memory_order_relaxed);
 
     // Push the task to the back of the next thread's task queue
-    task_queues[next_thread_id].tasks.push_back(std::forward<F>(task_handler));
+    task_queues[next_thread_id].tasks.push_back(std::forward<F>(task));
 
     // Signal the thread that a new task has been added
     task_queues[next_thread_id].ready.release();
