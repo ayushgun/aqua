@@ -18,7 +18,7 @@ target_include_directories(aqua PUBLIC
 find_package(GTest REQUIRED)
 if(GTEST_FOUND)
     enable_testing()
-    add_executable(aqua_tests test/test_pool.cpp)
+    add_executable(aqua_tests test/test_pool.cpp test/test_queue.cpp)
     target_link_libraries(aqua_tests GTest::GTest GTest::Main aqua)
     target_include_directories(aqua_tests PRIVATE ${GTEST_INCLUDE_DIRS})
 

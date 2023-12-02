@@ -1,11 +1,11 @@
 #include <gtest/gtest.h>
-#include <aqua/pool.hpp>
 #include <future>
 #include <mutex>
 #include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include "aqua/pool.hpp"
 
 /// Calculate the nth Fibonacci number recursively.
 int fib(int n) {
@@ -30,7 +30,7 @@ std::pair<std::thread::id, int> task(int n) {
 /// each test.
 class ThreadPoolTest : public ::testing::Test {
  protected:
-  aqua::thread_pool pool;  // Thread pool instance
+  aqua::thread_pool test_pool;
 };
 
 /// Test to check if tasks are executed and produce the correct number of
@@ -54,8 +54,8 @@ TEST_F(ThreadPoolTest, TaskExecutionAndResult) {
       };
 
   // Submit tasks in parallel threads
-  std::thread thread1(submit_tasks, std::ref(pool), std::ref(futures), 5);
-  std::thread thread2(submit_tasks, std::ref(pool), std::ref(futures), 5);
+  std::thread thread1(submit_tasks, std::ref(test_pool), std::ref(futures), 5);
+  std::thread thread2(submit_tasks, std::ref(test_pool), std::ref(futures), 5);
   thread1.join();
   thread2.join();
 
@@ -70,7 +70,8 @@ TEST_F(ThreadPoolTest, TaskDistribution) {
   // Submit a number of tasks equal to three times the hardware concurrency
   std::size_t total_tasks = std::thread::hardware_concurrency() * 3;
   for (std::size_t i = 0; i < total_tasks; ++i) {
-    futures.push_back(pool.submit<std::pair<std::thread::id, int>>(task, i));
+    futures.push_back(
+        test_pool.submit<std::pair<std::thread::id, int>>(task, i));
   }
 
   // Process the results and count tasks per thread
