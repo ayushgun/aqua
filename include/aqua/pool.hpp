@@ -18,7 +18,7 @@ namespace aqua {
 class thread_pool {
  public:
   /// Constructs a thread pool with a specified number of threads.
-  explicit thread_pool(const std::size_t thread_count);
+  explicit thread_pool(std::size_t thread_count);
 
   /// Constructs a default thread pool with hardware-concurrency based size.
   explicit thread_pool();
@@ -33,7 +33,7 @@ class thread_pool {
   std::size_t size() const;
 
   /// Submits a task to the pool and returns a future<R> to the caller. All
-  /// exceptions are propogated via the returned future.
+  /// exceptions are propagated via the returned future.
   template <typename R, typename F, typename... A>
     requires std::is_invocable_r_v<R, F, A...>
   std::future<R> submit(F function, A... arguments) {
@@ -44,7 +44,7 @@ class thread_pool {
                  ... args = std::move(arguments)]() {
       try {
         // Call the callable and store the return value in the promise if the
-        // callable does not returns void
+        // callable does not return void
         if constexpr (std::is_same_v<R, void>) {
           callable(args...);
           promise->set_value();
@@ -52,7 +52,7 @@ class thread_pool {
           promise->set_value(callable(args...));
         }
       } catch (...) {
-        // Propogate the exception if the callable throws an exception
+        // Propagate the exception if the callable throws an exception
         promise->set_exception(std::current_exception());
       }
     };
@@ -62,7 +62,7 @@ class thread_pool {
   }
 
   /// Submits a void-returning task to the pool and returns a future<void> to
-  /// the caller. All exceptions are propogated via the returned future.
+  /// the caller. All exceptions are propagated via the returned future.
   template <typename F, typename... A>
     requires std::is_invocable_v<F, A...>
   std::future<void> submit(F function, A... arguments) {

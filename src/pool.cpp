@@ -1,5 +1,4 @@
 #include <atomic>
-#include <functional>
 #include <memory>
 #include <thread>
 
@@ -50,7 +49,7 @@ aqua::thread_pool::~thread_pool() {
     stop_flags[thread_idx]->test_and_set();
   }
 
-  // Unblock all threads and join all joinable threads
+  // Unblock all threads and join all threads that can be joined
   for (std::size_t thread_idx = 0; thread_idx < threads.size(); ++thread_idx) {
     task_queues[thread_idx].ready.release();
 

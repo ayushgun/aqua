@@ -18,14 +18,14 @@ concept lockable = requires(T& t) {
 template <typename T, lockable L>
 class queue {
  public:
-  /// Returns the front element of the queue, or nullopt if empty.
+  /// Returns the front element of the queue, or null if empty.
   std::optional<T> front() {
     std::scoped_lock lock(mutex);
     return (!backing_queue.empty()) ? std::optional<T>(backing_queue.front())
                                     : std::nullopt;
   }
 
-  /// Returns the back element of the queue, or nullopt if empty.
+  /// Returns the back element of the queue, or null if empty.
   std::optional<T> back() {
     std::scoped_lock lock(mutex);
     return (!backing_queue.empty()) ? std::optional<T>(backing_queue.back())
@@ -74,7 +74,7 @@ class queue {
     }
   }
 
-  /// Returns the last element from the queue, or returns nullopt if empty.
+  /// Returns the last element from the queue, or returns null if empty.
   std::optional<T> steal() {
     std::scoped_lock lock(mutex);
 
