@@ -1,6 +1,6 @@
 # Aqua ![License Badge](https://img.shields.io/badge/license-MIT-blue?link=https%3A%2F%2Fgithub.com%2Fayushgun%2Faqua%2Fblob%2Fmain%2FLICENSE) ![PR Badge](https://img.shields.io/badge/PRs-welcome-red)
 
-Aqua is a minimal, modern, and portable C++ thread pool library designed for managing and executing a queue of tasks concurrently.
+Aqua is a simple, modern, and minimal C++ thread pool library designed for managing and executing a queue of tasks concurrently.
 
 ## About
 
