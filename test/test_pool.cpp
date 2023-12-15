@@ -65,12 +65,13 @@ TEST_F(ThreadPoolTest, TaskExecutionAndResult) {
 /// Test to verify if tasks are evenly distributed across different threads in
 /// the pool.
 TEST_F(ThreadPoolTest, TaskDistribution) {
-  constexpr int NUM_TASKS = 3;
+  constexpr int TASKS_PER_THREAD = 3;
   std::vector<std::future<std::pair<std::thread::id, int>>> futures;
   std::unordered_map<std::thread::id, int> thread_distribution;
 
   // Submit a number of tasks equal to three times the hardware concurrency
-  std::size_t total_tasks = std::thread::hardware_concurrency() * NUM_TASKS;
+  std::size_t total_tasks =
+      std::thread::hardware_concurrency() * TASKS_PER_THREAD;
   for (std::size_t i = 0; i < total_tasks; ++i) {
     futures.push_back(
         test_pool.submit<std::pair<std::thread::id, int>>(task, i));
@@ -86,8 +87,8 @@ TEST_F(ThreadPoolTest, TaskDistribution) {
   EXPECT_EQ(thread_distribution.size(), std::thread::hardware_concurrency());
 
   // Check if the number of tasks completed by each thread is correct
-  for (const std::pair<std::thread::id, int>& entry : thread_distribution) {
-    EXPECT_EQ(entry.second, NUM_TASKS);
+  for (const std::pair<std::thread::id, int> entry : thread_distribution) {
+    EXPECT_EQ(entry.second, TASKS_PER_THREAD);
   }
 }
 
