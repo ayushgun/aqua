@@ -95,15 +95,15 @@ class thread_pool {
   template <typename F>
   void schedule_task(F&& task) {
     // Find the next thread to push the task onto
-    std::size_t next_thread_idx = submitted_tasks % threads.size();
-    submitted_tasks.fetch_add(1, std::memory_order_relaxed);
+    current_task_id.fetch_add(1, std::memory_order_relaxed);
     unprocessed_tasks.fetch_add(1, std::memory_order_relaxed);
+    current_task_id = current_task_id % threads.size();
 
     // Push the task to the back of the next thread's task queue
-    task_queues[next_thread_idx].tasks.push_back(std::forward<F>(task));
+    task_queues[current_task_id].tasks.push_back(std::forward<F>(task));
 
     // Signal the thread that a new task has been added
-    task_queues[next_thread_idx].ready.release();
+    task_queues[current_task_id].ready.release();
   }
 
   /// Represents a task queue with thread-safe task storage and a semaphore
@@ -113,8 +113,8 @@ class thread_pool {
     std::binary_semaphore ready{0};
   };
 
-  std::atomic_int_fast32_t unprocessed_tasks{};
-  std::atomic_int_fast32_t submitted_tasks{};
+  std::atomic_int_fast16_t current_task_id;
+  std::atomic_int_fast32_t unprocessed_tasks;
 
   std::vector<std::thread> threads;
   std::vector<std::unique_ptr<std::atomic_flag>> stop_flags;
