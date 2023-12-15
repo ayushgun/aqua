@@ -74,19 +74,6 @@ class queue {
     }
   }
 
-  /// Returns the last element from the queue, or returns null if empty.
-  std::optional<T> steal() {
-    std::scoped_lock lock(mutex);
-
-    if (backing_queue.empty()) {
-      return std::nullopt;
-    }
-
-    auto back = std::move(backing_queue.back());
-    backing_queue.pop_back();
-    return back;
-  }
-
   /// Checks if the queue is empty.
   bool empty() {
     std::scoped_lock lock(mutex);

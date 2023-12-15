@@ -57,14 +57,6 @@ TEST_F(QueueTest, TestPopFront) {
   EXPECT_EQ(test_queue.front().value(), 70);
 }
 
-/// Tests the steal method to ensure it returns and removes the last element.
-TEST_F(QueueTest, TestSteal) {
-  test_queue.push_back(90);
-  auto stolen = test_queue.steal();
-  EXPECT_EQ(stolen.value(), 90);
-  EXPECT_TRUE(test_queue.empty());
-}
-
 /// Tests the empty method for both empty and non-empty states.
 TEST_F(QueueTest, TestEmpty) {
   EXPECT_TRUE(test_queue.empty());
