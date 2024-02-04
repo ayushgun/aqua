@@ -14,11 +14,11 @@ aqua::thread_pool::thread_pool(const std::size_t thread_count)
   stop_flags.reserve(thread_count);
 
   for (std::size_t i = 0; i < thread_count; ++i) {
-    // Create a stop flag for this thread to enable cooperative interruption
+    // Create a stop flag for this thread to allow for cooperative interruption
     stop_flags.push_back(std::make_unique<std::atomic_flag>());
     stop_flags.back()->clear();
 
-    // Initialize the thread with logic to process tasks in the pool
+    // Initialize the thread with logic to process tasks in its queue
     threads.emplace_back([&, i]() { thread_loop(i); });
   }
 }
@@ -31,7 +31,6 @@ void aqua::thread_pool::thread_loop(std::size_t thread_idx) {
 
     // Process tasks while there are still unprocessed tasks left
     while (unprocessed_tasks.load(std::memory_order_acquire) > 0) {
-      // Process all available tasks in this thread's task queue
       while (auto task_opt = task_queues[thread_idx].tasks.front()) {
         task_queues[thread_idx].tasks.pop_front();
 
