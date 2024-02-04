@@ -20,7 +20,7 @@ class thread_pool {
   /// Constructs a thread pool with a specified number of threads.
   explicit thread_pool(std::size_t thread_count);
 
-  /// Constructs a default thread pool with hardware-concurrency based size.
+  /// Constructs a default thread pool with a default number of threads.
   explicit thread_pool();
 
   /// Destructor for cleaning up and joining threads.
