@@ -8,31 +8,27 @@ aqua::thread_pool::thread_pool()
     : aqua::thread_pool::thread_pool(std::thread::hardware_concurrency()) {}
 
 aqua::thread_pool::thread_pool(const std::size_t thread_count)
-    : task_queues(thread_count) {
-  // Pre-allocate space for each thread and its stop flag
-  threads.reserve(thread_count);
-  stop_flags.reserve(thread_count);
-
-  for (std::size_t i = 0; i < thread_count; ++i) {
+    : workers(thread_count) {
+  for (std::size_t id = 0; id < thread_count; ++id) {
     // Create a stop flag for this thread to allow for cooperative interruption
-    stop_flags.push_back(std::make_unique<std::atomic_flag>());
-    stop_flags.back()->clear();
+    workers[id].stop_flag = std::make_unique<std::atomic_flag>();
+    workers[id].stop_flag->clear();
 
     // Initialize the thread with logic to process tasks in its queue
-    threads.emplace_back([&, i]() { thread_loop(i); });
+    workers[id].thread = std::thread([&, id]() { thread_loop(id); });
   }
 }
 
-void aqua::thread_pool::thread_loop(std::size_t thread_idx) {
-  while (!stop_flags[thread_idx]->test()) {
-    // Acquire the semaphore to block until this thread is signalled to
+void aqua::thread_pool::thread_loop(std::size_t worker_id) {
+  while (!workers[worker_id].stop_flag->test()) {
+    // Acquire the semaphore to block until this worker thread is signalled to
     // continue processing tasks
-    task_queues[thread_idx].ready.acquire();
+    workers[worker_id].ready.acquire();
 
     // Process tasks while there are still unprocessed tasks left
     while (unprocessed_tasks.load(std::memory_order_acquire) > 0) {
-      while (auto task_opt = task_queues[thread_idx].tasks.front()) {
-        task_queues[thread_idx].tasks.pop_front();
+      while (auto task_opt = workers[worker_id].tasks.front()) {
+        workers[worker_id].tasks.pop_front();
 
         // Execute the task and decrement the number of unprocessed tasks
         std::invoke(std::move(*task_opt));
@@ -43,17 +39,17 @@ void aqua::thread_pool::thread_loop(std::size_t thread_idx) {
 }
 
 aqua::thread_pool::~thread_pool() {
-  // Cooperatively interrupt all thread's execution
-  for (std::size_t thread_idx = 0; thread_idx < threads.size(); ++thread_idx) {
-    stop_flags[thread_idx]->test_and_set();
+  // Cooperatively interrupt all worker threads' execution
+  for (std::size_t id = 0; id < workers.size(); ++id) {
+    workers[id].stop_flag->test_and_set();
   }
 
   // Unblock all threads and join all threads that can be joined
-  for (std::size_t thread_idx = 0; thread_idx < threads.size(); ++thread_idx) {
-    task_queues[thread_idx].ready.release();
+  for (std::size_t id = 0; id < workers.size(); ++id) {
+    workers[id].ready.release();
 
-    if (threads[thread_idx].joinable()) {
-      threads[thread_idx].join();
+    if (workers[id].thread.joinable()) {
+      workers[id].thread.join();
     }
   }
 }

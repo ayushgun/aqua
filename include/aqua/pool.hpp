@@ -1,7 +1,6 @@
 #pragma once
 
 #include <atomic>
-#include <deque>
 #include <functional>
 #include <future>
 #include <memory>
@@ -86,9 +85,9 @@ class thread_pool {
   }
 
  private:
-  /// Executes the main loop for each thread, processing tasks from the task
-  /// queue until stopped.
-  void thread_loop(std::size_t thread_idx);
+  /// Executes the main loop for each worker thread, processing tasks from the
+  /// task queue until stopped.
+  void thread_loop(std::size_t worker_id);
 
   /// Schedules a task by adding it to the queue of a selected thread based on a
   /// round robin load balancing policy.
@@ -97,27 +96,26 @@ class thread_pool {
     // Find the next thread to push the task onto
     current_task_id.fetch_add(1, std::memory_order_relaxed);
     unprocessed_tasks.fetch_add(1, std::memory_order_relaxed);
-    current_task_id = current_task_id % threads.size();
+    std::size_t worker_id = current_task_id % workers.size();
 
-    // Push the task to the back of the next thread's task queue
-    task_queues[current_task_id].tasks.push_back(std::forward<F>(task));
+    // Push the task to the back of the scheduled worker's task queue
+    workers[worker_id].tasks.push_back(std::forward<F>(task));
 
-    // Signal the thread that a new task has been added
-    task_queues[current_task_id].ready.release();
+    // Signal the worker that a new task has been added
+    workers[worker_id].ready.release();
   }
 
-  /// Represents a task queue with thread-safe task storage and a semaphore
-  /// indicating task availability.
-  struct task_queue {
-    aqua::queue<std::function<void()>, std::mutex> tasks;
+  // Represents a worker in a thread pool, managing task execution,
+  // synchronization, and lifecycle control.
+  struct worker {
     std::binary_semaphore ready{0};
+    std::unique_ptr<std::atomic_flag> stop_flag;
+    aqua::queue<std::function<void()>, std::mutex> tasks;
+    std::thread thread;
   };
 
   std::atomic_int_fast16_t current_task_id;
   std::atomic_int_fast32_t unprocessed_tasks;
-
-  std::vector<std::thread> threads;
-  std::vector<std::unique_ptr<std::atomic_flag>> stop_flags;
-  std::deque<task_queue> task_queues;
+  std::vector<worker> workers;
 };
 }  // namespace aqua
