@@ -10,18 +10,19 @@ aqua::thread_pool::thread_pool()
 aqua::thread_pool::thread_pool(const std::size_t thread_count)
     : workers(thread_count) {
   for (std::size_t id = 0; id < thread_count; ++id) {
-    // Create a stop flag for this thread to allow for cooperative interruption
+    // Create a stop flag for this worker thread to enable cooperative
+    // interruption
     workers[id].stop_flag = std::make_unique<std::atomic_flag>();
     workers[id].stop_flag->clear();
 
-    // Initialize the thread with logic to process tasks in its queue
+    // Initialize the worker thread with logic to process tasks in its queue
     workers[id].thread = std::thread([&, id]() { thread_loop(id); });
   }
 }
 
 void aqua::thread_pool::thread_loop(std::size_t worker_id) {
   while (!workers[worker_id].stop_flag->test()) {
-    // Acquire the semaphore to block until this worker thread is signalled to
+    // Acquire the semaphore to block until this worker thread is signaled to
     // continue processing tasks
     workers[worker_id].ready.acquire();
 
@@ -44,7 +45,7 @@ aqua::thread_pool::~thread_pool() {
     workers[id].stop_flag->test_and_set();
   }
 
-  // Unblock all threads and join all threads that can be joined
+  // Unblock all threads and join all workers that can be joined
   for (std::size_t id = 0; id < workers.size(); ++id) {
     workers[id].ready.release();
 

@@ -13,16 +13,17 @@
 #include "aqua/queue.hpp"
 
 namespace aqua {
-/// A thread pool for managing and executing a queue of tasks in parallel.
+/// A thread pool for managing and executing a queue of worker tasks
+/// concurrently.
 class thread_pool {
  public:
-  /// Constructs a thread pool with a specified number of threads.
+  /// Constructs a thread pool with a specified number of worker threads.
   explicit thread_pool(std::size_t thread_count);
 
-  /// Constructs a default thread pool with a default number of threads.
+  /// Constructs a default thread pool with a default number of worker threads.
   explicit thread_pool();
 
-  /// Destructor for cleaning up and joining threads.
+  /// Destructor for cleaning up and joining worker threads.
   ~thread_pool();
 
   thread_pool(const thread_pool&) = delete;
@@ -32,7 +33,7 @@ class thread_pool {
   std::size_t size() const;
 
   /// Submits a task to the pool and returns a future<R> to the caller. All
-  /// exceptions are propagated via the returned future.
+  /// return values or exceptions are propagated via the returned future.
   template <typename R, typename F, typename... A>
     requires std::is_invocable_r_v<R, F, A...>
   std::future<R> submit(F function, A... arguments) {
@@ -61,7 +62,8 @@ class thread_pool {
   }
 
   /// Submits a void-returning task to the pool and returns a future<void> to
-  /// the caller. All exceptions are propagated via the returned future.
+  /// the caller. All  return values or exceptions are propagated via the
+  /// returned future.
   template <typename F, typename... A>
     requires std::is_invocable_v<F, A...>
   std::future<void> submit(F function, A... arguments) {
@@ -89,11 +91,11 @@ class thread_pool {
   /// task queue until stopped.
   void thread_loop(std::size_t worker_id);
 
-  /// Schedules a task by adding it to the queue of a selected thread based on a
-  /// round robin load balancing policy.
+  /// Schedules a task by adding it to the queue of a worker thread. Uses the
+  /// round robin scheduling algorithm.
   template <typename F>
   void schedule_task(F&& task) {
-    // Find the next thread to push the task onto
+    // Find the worker thread to assign the task to
     current_task_id.fetch_add(1, std::memory_order_relaxed);
     unprocessed_tasks.fetch_add(1, std::memory_order_relaxed);
     std::size_t worker_id = current_task_id % workers.size();
@@ -101,11 +103,11 @@ class thread_pool {
     // Push the task to the back of the scheduled worker's task queue
     workers[worker_id].tasks.push_back(std::forward<F>(task));
 
-    // Signal the worker that a new task has been added
+    // Signal the worker that tasks are ready to be completed
     workers[worker_id].ready.release();
   }
 
-  // Represents a worker in a thread pool, managing task execution,
+  // Represents a worker in a thread pool. Manages task execution,
   // synchronization, and lifecycle control.
   struct worker {
     std::binary_semaphore ready{0};
