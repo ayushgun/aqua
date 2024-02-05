@@ -27,12 +27,14 @@ void aqua::thread_pool::thread_loop(std::size_t worker_id) {
     workers[worker_id].ready.acquire();
 
     // Process tasks while there are still unprocessed tasks left
-    while (unprocessed_tasks.load(std::memory_order_acquire) > 0) {
-      while (auto task_opt = workers[worker_id].tasks.front()) {
-        workers[worker_id].tasks.pop_front();
+    auto& task_queue = workers[worker_id].tasks;
+    while (unprocessed_tasks.load(std::memory_order_acquire) > 0 &&
+           task_queue.read_available() > 0) {
+      while (auto task = task_queue.front()) {
+        task_queue.pop();
 
         // Execute the task and decrement the number of unprocessed tasks
-        std::invoke(std::move(*task_opt));
+        std::invoke(std::move(task));
         unprocessed_tasks.fetch_sub(1, std::memory_order_release);
       }
     }
