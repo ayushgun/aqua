@@ -22,15 +22,16 @@ Aqua offers a straightforward API to create a pool of worker threads which can e
 int main() {
   aqua::thread_pool pool;
 
-  // Submit a void callable to the thread pool
-  pool.submit([]() { std::cout << "Void task executed.\n"; });
-
   // Submit a callable that increments an integer and returns the result
-  auto future = pool.submit<int>([](int value) { return ++value; }, 1);
+  auto submission = pool.submit<int>([](int value) { return ++value; }, 1);
   //                        ^^^
-  //                        Explicitly provide the return type as a template argument
+  //                        Explicitly provide the return type for non-void callables
 
-  std::cout << "Task returned: " << future.get() << "\n";
+  // Unpack the return value propagated to the future if there are no submission errors
+  if (!std::holds_alternative<aqua::submission_error>(submission)) {
+    auto future = std::get<std::future<int>>(int_result);
+    std::cout << "Task returned: " << future.get() << "\n";
+  }
 
   return 0;
 }
