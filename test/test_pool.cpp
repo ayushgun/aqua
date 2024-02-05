@@ -45,17 +45,11 @@ TEST_F(ThreadPoolTest, TaskExecutionAndResult) {
           std::vector<std::future<std::pair<std::thread::id, int>>>& futures,
           int count) {
         for (int i = 0; i < count; ++i) {
-          auto submission_result =
-              pool.submit<std::pair<std::thread::id, int>>(task, i);
+          auto fut = pool.submit<std::pair<std::thread::id, int>>(task, i);
 
-          if (!std::holds_alternative<aqua::submission_error>(
-                  submission_result)) {
-            // Lock to synchronize access to futures
-            std::lock_guard<std::mutex> lock(futures_mutex);
-            futures.push_back(std::move(
-                std::get<std::future<std::pair<std::thread::id, int>>>(
-                    submission_result)));
-          }
+          // Lock to synchronize access to futures
+          std::lock_guard<std::mutex> lock(futures_mutex);
+          futures.push_back(std::move(fut));
         }
       };
 
@@ -79,14 +73,8 @@ TEST_F(ThreadPoolTest, TaskDistribution) {
   std::size_t total_tasks =
       std::thread::hardware_concurrency() * TASKS_PER_THREAD;
   for (std::size_t i = 0; i < total_tasks; ++i) {
-    auto submission_result =
-        test_pool.submit<std::pair<std::thread::id, int>>(task, i);
-
-    if (!std::holds_alternative<aqua::submission_error>(submission_result)) {
-      futures.push_back(
-          std::move(std::get<std::future<std::pair<std::thread::id, int>>>(
-              submission_result)));
-    }
+    futures.push_back(
+        test_pool.submit<std::pair<std::thread::id, int>>(task, i));
   }
 
   // Process the results and count tasks per thread
