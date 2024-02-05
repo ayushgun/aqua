@@ -95,16 +95,17 @@ class thread_pool {
   /// round robin scheduling algorithm.
   template <typename F>
   void schedule_task(F&& task) {
-    // Find the worker thread to assign the task to
-    current_task_id.fetch_add(1, std::memory_order_relaxed);
     unprocessed_tasks.fetch_add(1, std::memory_order_relaxed);
-    std::size_t worker_id = current_task_id % workers.size();
+
+    // Find the worker thread to assign the task to
+    next_worker_id.fetch_add(1, std::memory_order_relaxed);
+    next_worker_id = next_worker_id % workers.size();
 
     // Push the task to the back of the scheduled worker's task queue
-    workers[worker_id].tasks.push_back(std::forward<F>(task));
+    workers[next_worker_id].tasks.push_back(std::forward<F>(task));
 
     // Signal the worker that tasks are ready to be completed
-    workers[worker_id].ready.release();
+    workers[next_worker_id].ready.release();
   }
 
   // Represents a worker in a thread pool. Manages task execution,
@@ -116,8 +117,8 @@ class thread_pool {
     std::thread thread;
   };
 
-  std::atomic_int_fast16_t current_task_id;
-  std::atomic_int_fast32_t unprocessed_tasks;
+  std::atomic_int16_t next_worker_id;
+  std::atomic_int32_t unprocessed_tasks;
   std::vector<worker> workers;
 };
 }  // namespace aqua
