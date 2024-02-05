@@ -1,27 +1,27 @@
 cmake_minimum_required(VERSION 3.27)
-project(aqua)
+project(aqua LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(DEV_WARNINGS "-Wall -Wextra -Werror -pedantic")
-    set(SANITIZERS "-fsanitize=undefined -fsanitize=thread")
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${DEV_WARNINGS} ${SANITIZERS}")
-endif()
+add_compile_options(
+    "$<$<CONFIG:DEBUG>:-Wall;-Wextra;-Werror;-pedantic;-fsanitize=undefined;-fsanitize=thread>"
+)
+
+find_package(Boost 1.83.0 REQUIRED COMPONENTS system thread)
+find_package(GTest REQUIRED)
 
 add_library(aqua SHARED src/pool.cpp)
 target_include_directories(aqua PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
+target_link_libraries(aqua PRIVATE ${Boost_LIBRARIES})
 
-find_package(GTest REQUIRED)
-if(GTEST_FOUND)
-    enable_testing()
-    add_executable(aqua_tests test/test_pool.cpp test/test_queue.cpp)
-    target_link_libraries(aqua_tests GTest::GTest GTest::Main aqua)
-    target_include_directories(aqua_tests PRIVATE ${GTEST_INCLUDE_DIRS})
+enable_testing()
+add_executable(aqua_tests test/test_pool.cpp)
+target_link_libraries(aqua_tests PRIVATE GTest::GTest GTest::Main aqua)
 
-    include(GoogleTest)
-    gtest_discover_tests(aqua_tests)
-endif()
+include(GoogleTest)
+gtest_discover_tests(aqua_tests)
